@@ -1,12 +1,17 @@
 import { StatusBar } from 'expo-status-bar';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import HomeScreen from '@/screens/HomeScreen';
-import '@/global.css';
+import { NavigationContainer } from '@react-navigation/native';
+
+import AppNavigator from '@/navigation/AppNavigator';
+import './global.css';
 
 export default function App() {
   return (
     <SafeAreaProvider>
-      <HomeScreen />
+      <NavigationContainer>
+        <AppNavigator />
+      </NavigationContainer>
+
       <StatusBar style="auto" />
     </SafeAreaProvider>
   );
