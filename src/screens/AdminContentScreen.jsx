@@ -37,16 +37,9 @@ const getTimestamp = (value) => {
   return Number.isNaN(parsed) ? 0 : parsed;
 };
 
-const getPostDisplayName = (post) =>
-  [post?.userResponse?.firstName, post?.userResponse?.lastName].filter(Boolean).join(' ') || 'unknown';
-
 const isApiErrorPayload = (value) =>
   Boolean(
-    value &&
-      typeof value === 'object' &&
-      'code' in value &&
-      'message' in value &&
-      !('id' in value)
+    value && typeof value === 'object' && 'code' in value && 'message' in value && !('id' in value)
   );
 
 const ModerationCard = ({ item, onIgnore, onDelete, onView }) => (
@@ -68,13 +61,6 @@ const ModerationCard = ({ item, onIgnore, onDelete, onView }) => (
     </View>
 
     <TouchableOpacity className="px-3 pb-2 pt-3" activeOpacity={0.8} onPress={() => onView(item)}>
-      <View className="mb-2 flex-row items-center">
-        <View className="mr-2 h-9 w-9 items-center justify-center rounded-full bg-gray-200">
-          <Text style={{ fontSize: 16 }}>👤</Text>
-        </View>
-        <Text className="text-sm font-semibold text-gray-900">{item.username}</Text>
-      </View>
-
       <Text className="mb-1 text-sm font-semibold text-gray-900">{item.title}</Text>
       {item.caption ? <Text className="mb-2 text-sm text-gray-700">{item.caption}</Text> : null}
 
@@ -149,9 +135,6 @@ export default function AdminContentScreen() {
       reason: 'BÀI VIẾT BỊ CẢNH BÁO',
       reasonIcon: '⚠️',
       warningStatus: post?.warning ? 'CẢNH BÁO' : 'BÌNH THƯỜNG',
-      username:
-        [post?.userResponse?.firstName, post?.userResponse?.lastName].filter(Boolean).join(' ') ||
-        'unknown',
       title: post?.title ?? '',
       caption: post?.content ?? '',
       hasImage: Array.isArray(post?.images) && post.images.length > 0,
@@ -182,7 +165,6 @@ export default function AdminContentScreen() {
           postId,
           title: relatedPost?.title ?? '',
           caption: relatedPost?.content ?? '',
-          username: getPostDisplayName(relatedPost),
           hasImage: Array.isArray(relatedPost?.images) && relatedPost.images.length > 0,
           time: createdAt,
           reportCount: 0,
@@ -205,11 +187,11 @@ export default function AdminContentScreen() {
         current.caption = relatedPost.content;
       }
 
-      if ((!current.username || current.username === 'unknown') && relatedPost) {
-        current.username = getPostDisplayName(relatedPost);
-      }
-
-      if (!current.hasImage && Array.isArray(relatedPost?.images) && relatedPost.images.length > 0) {
+      if (
+        !current.hasImage &&
+        Array.isArray(relatedPost?.images) &&
+        relatedPost.images.length > 0
+      ) {
         current.hasImage = true;
       }
 
@@ -248,7 +230,6 @@ export default function AdminContentScreen() {
         postId: post.postId,
         title: post.title || `Bài viết #${post.postId || 'không xác định'}`,
         caption: post.caption,
-        username: post.username,
         hasImage: post.hasImage,
         warning: post.warning,
         warningReason: post.warningReason,
@@ -268,7 +249,6 @@ export default function AdminContentScreen() {
           postId: report.postId,
           title: report.title || `Bài viết #${report.postId || 'không xác định'}`,
           caption: report.caption ?? '',
-          username: report.username ?? 'unknown',
           hasImage: Boolean(report.hasImage),
           warning: false,
           warningReason: '',
@@ -287,9 +267,6 @@ export default function AdminContentScreen() {
       }
       if (!current.caption && report.caption) {
         current.caption = report.caption;
-      }
-      if ((!current.username || current.username === 'unknown') && report.username) {
-        current.username = report.username;
       }
       if (!current.hasImage && report.hasImage) {
         current.hasImage = report.hasImage;
@@ -338,7 +315,6 @@ export default function AdminContentScreen() {
         }
       })
     );
-
     setReports(normalizeReports(payload, Object.fromEntries(postEntries)));
   }, [normalizeReports]);
 

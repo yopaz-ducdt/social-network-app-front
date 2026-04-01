@@ -52,7 +52,10 @@ export default function AdminDashboardScreen() {
             0
         );
         setTotalReports(
-          reportsPayload?.totalElements ?? reportsPayload?.content?.length ?? reportsPayload?.length ?? 0
+          reportsPayload?.totalElements ??
+            reportsPayload?.content?.length ??
+            reportsPayload?.length ??
+            0
         );
       } catch {
         // ignore
@@ -67,14 +70,24 @@ export default function AdminDashboardScreen() {
   }, [isFocused]);
 
   const STATS = [
-    { id: 'users', icon: '👥', value: loading ? '...' : totalUsers.toLocaleString(), label: 'Tổng users' },
+    {
+      id: 'users',
+      icon: '👥',
+      value: loading ? '...' : totalUsers.toLocaleString(),
+      label: 'Tổng users',
+    },
     {
       id: 'warning-posts',
       icon: '🚫',
       value: loading ? '...' : totalWarningPosts.toLocaleString(),
       label: 'Bài bị cảnh báo',
     },
-    { id: 'reports', icon: 'ℹ️', value: loading ? '...' : totalReports.toLocaleString(), label: 'Phiếu tố cáo' },
+    {
+      id: 'reports',
+      icon: 'ℹ️',
+      value: loading ? '...' : totalReports.toLocaleString(),
+      label: 'Phiếu tố cáo',
+    },
   ];
 
   return (
@@ -117,8 +130,9 @@ export default function AdminDashboardScreen() {
                 key={mod.id}
                 onPress={() => navigation.navigate(mod.screen)}
                 activeOpacity={0.7}
-                className={`flex-row items-center bg-white px-4 py-4 ${index < MODULES.length - 1 ? 'border-b border-gray-100' : ''
-                  }`}>
+                className={`flex-row items-center bg-white px-4 py-4 ${
+                  index < MODULES.length - 1 ? 'border-b border-gray-100' : ''
+                }`}>
                 <View className="mr-3 h-10 w-10 items-center justify-center rounded-xl bg-gray-100">
                   <Text style={{ fontSize: 18 }}>{mod.icon}</Text>
                 </View>

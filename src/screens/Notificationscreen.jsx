@@ -1,178 +1,271 @@
-import { useState } from 'react';
-import { View, Text, TouchableOpacity, ScrollView } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { View, Text, TouchableOpacity, FlatList, ActivityIndicator, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BottomTab from '../components/BottomTab';
+import { userService } from '@/services/userService';
 
-// ─── Fake Data ───────────────────────────────────────────────
-const NOTIFICATIONS = [
-  {
-    id: '1',
-    type: 'follow',
-    avatar: null,
-    title: 'Nguyễn Văn A đã bắt đầu theo dõi bạn.',
-    time: '2 phút trước',
-    action: 'follow', // hiện nút "Theo dõi lại"
-    isFollowing: false,
-  },
-  {
-    id: '2',
-    type: 'security',
-    avatar: 'security',
-    title: 'Cảnh báo bảo mật',
-    subtitle: 'Phát hiện đăng nhập mới trên thiết bị lạ.',
-    time: '15 phút trước',
-    action: 'more',
-    unread: true,
-  },
-  {
-    id: '3',
-    type: 'like',
-    avatar: null,
-    title: 'Trần Thị B đã thích bài viết của bạn.',
-    time: '1 giờ trước',
-    action: 'thumbnail',
-  },
-  {
-    id: '4',
-    type: 'comment',
-    avatar: null,
-    title: 'Le Van C đã bình luận: "Bài viết rất hữu ích!"',
-    time: '3 giờ trước',
-    action: 'thumbnail',
-  },
-  {
-    id: '5',
-    type: 'mention',
-    avatar: null,
-    title: 'Hoàng D đã nhắc đến bạn trong một bình luận.',
-    time: 'Hôm qua',
-    action: 'more',
-  },
-];
+const formatNotificationTime = (value) => {
+  if (!value) return '';
 
-// ─── Icons ───────────────────────────────────────────────────
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return value;
+
+  const now = new Date();
+  const isSameDay =
+    date.getFullYear() === now.getFullYear() &&
+    date.getMonth() === now.getMonth() &&
+    date.getDate() === now.getDate();
+
+  if (isSameDay) {
+    return date.toLocaleTimeString('vi-VN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  }
+
+  return date.toLocaleDateString('vi-VN', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+};
+
+const detectType = (content = '') => {
+  if (content.includes('follow')) return 'follow';
+  if (content.includes('liked')) return 'like';
+  if (content.includes('commented')) return 'comment';
+  return 'system';
+};
+
+const normalizeNotification = (raw) => {
+  const content = raw?.content ?? '';
+  const createdAt = raw?.createdAt ?? '';
+  return {
+    id: String(raw?.id ?? Math.random()),
+    senderId: raw?.targetId ? String(raw.targetId) : null,
+    senderName: raw?.sender ?? 'Hệ thống',
+    title: raw?.sender ? `${raw.sender} ${content}` : content || 'Thông báo hệ thống',
+    createdAt,
+    time: formatNotificationTime(createdAt),
+    unread: Boolean(raw?.isRead === false),
+    type: detectType(content),
+    avatarUrl: null,
+  };
+};
+
+const sortNotificationsByTime = (items) =>
+  [...items].sort((a, b) => {
+    const timeA = new Date(a?.createdAt ?? 0).getTime();
+    const timeB = new Date(b?.createdAt ?? 0).getTime();
+    return timeB - timeA;
+  });
+
 const IconUser = () => <Text style={{ fontSize: 20 }}>👤</Text>;
 const IconShield = () => <Text style={{ fontSize: 18 }}>🛡️</Text>;
 const IconHeart = () => <Text style={{ fontSize: 14, color: '#ef4444' }}>♥</Text>;
 const IconComment = () => <Text style={{ fontSize: 14, color: '#6b7280' }}>💬</Text>;
-const IconMention = () => <Text style={{ fontSize: 14, color: '#6b7280' }}>@</Text>;
-const IconMore = () => <Text style={{ fontWeight: 500, color: '#9ca3af' }}>•••</Text>;
 
-// Badge icon tuỳ type
-const TypeBadge = ({ type }) => {
+const TypeIcon = ({ type }) => {
   const map = {
-    like: { bg: 'bg-red-100', icon: <IconHeart /> },
-    comment: { bg: 'bg-gray-100', icon: <IconComment /> },
-    mention: { bg: 'bg-blue-100', icon: <IconMention /> },
+    like: ['bg-red-100', <IconHeart key="heart" />],
+    comment: ['bg-gray-100', <IconComment key="comment" />],
+    follow: [
+      'bg-emerald-100',
+      <Text key="follow" style={{ fontSize: 13, color: '#059669' }}>
+        +
+      </Text>,
+    ],
   };
+
   const config = map[type];
   if (!config) return null;
+
   return (
     <View
-      className={`absolute -bottom-0.5 -right-0.5 h-5 w-5 rounded-full ${config.bg} items-center justify-center border border-white`}>
-      {config.icon}
+      className={`h-7 w-7 items-center justify-center rounded-full border border-white ${config[0]}`}>
+      {config[1]}
     </View>
   );
 };
 
-// ─── Avatar ──────────────────────────────────────────────────
-const Avatar = ({ type }) => {
-  if (type === 'security') {
+const Avatar = ({ type, uri, label }) => {
+  if (type === 'system') {
     return (
-      <View className="h-11 w-11 items-center justify-center rounded-full bg-gray-900">
+      <View className="h-12 w-12 items-center justify-center rounded-full bg-gray-900">
         <IconShield />
       </View>
     );
   }
+
   return (
-    <View className="relative">
-      <View className="h-11 w-11 items-center justify-center rounded-full bg-gray-200">
+    <View className="h-12 w-12 items-center justify-center overflow-hidden rounded-full bg-gray-200">
+      {uri ? (
+        <Image source={{ uri }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+      ) : label ? (
+        <Text className="text-sm font-semibold text-gray-700">
+          {label.slice(0, 1).toUpperCase()}
+        </Text>
+      ) : (
         <IconUser />
-      </View>
-      <TypeBadge type={type} />
+      )}
     </View>
   );
 };
 
-// ─── Follow Button ────────────────────────────────────────────
-const FollowButton = ({ isFollowing, onPress }) => {
+const Toast = ({ visible, message }) => {
+  if (!visible) return null;
+
   return (
-    <TouchableOpacity
-      onPress={onPress}
-      activeOpacity={0.8}
-      className={`rounded-lg border px-4 py-1.5 ${
-        isFollowing ? 'border-gray-300 bg-white' : 'border-gray-900 bg-white'
-      }`}>
-      <Text className={`text-sm font-semibold ${isFollowing ? 'text-gray-500' : 'text-gray-900'}`}>
-        {isFollowing ? 'Đã theo dõi' : 'Theo dõi lại'}
-      </Text>
-    </TouchableOpacity>
+    <View className="absolute left-4 right-4 top-3 z-20 rounded-2xl bg-gray-900/95 px-4 py-3 shadow-lg">
+      <Text className="text-center text-sm font-medium text-white">{message}</Text>
+    </View>
   );
 };
 
-// ─── Thumbnail placeholder ────────────────────────────────────
-const Thumbnail = () => (
-  <View className="h-11 w-11 items-center justify-center rounded-md border border-gray-200 bg-gray-100">
-    <Text style={{ fontSize: 18 }}>🖼️</Text>
-  </View>
+const NotifItem = ({ item, onPress }) => (
+  <TouchableOpacity
+    activeOpacity={0.78}
+    onPress={() => onPress?.(item)}
+    className={`mx-4 mb-3 flex-row items-center rounded-2xl border px-4 py-3 ${
+      item.unread ? 'border-blue-100 bg-blue-50' : 'border-gray-100 bg-white'
+    }`}>
+    <View className="mr-3">
+      <Avatar type={item.type} uri={item.avatarUrl} label={item.senderName} />
+    </View>
+
+    <View className="flex-1">
+      <Text className="mb-1 text-sm leading-5 text-gray-900" numberOfLines={2}>
+        {item.title}
+      </Text>
+      <Text className={`text-xs ${item.unread ? 'text-blue-500' : 'text-gray-400'}`}>
+        {item.time}
+      </Text>
+    </View>
+
+    <View className="ml-3 items-center">
+      <TypeIcon type={item.type} />
+      {item.unread && <View className="mt-2 h-2.5 w-2.5 rounded-full bg-blue-500" />}
+    </View>
+  </TouchableOpacity>
 );
 
-// ─── Notification Item ────────────────────────────────────────
-const NotifItem = ({ item }) => {
-  const [isFollowing, setIsFollowing] = useState(item.isFollowing || false);
-
-  return (
-    <TouchableOpacity
-      activeOpacity={0.75}
-      className={`flex-row items-center px-4 py-3 ${item.unread ? 'bg-gray-50' : 'bg-white'}`}>
-      {/* Avatar */}
-      <View className="mr-3">
-        <Avatar type={item.type} />
-      </View>
-
-      {/* Content */}
-      <View className="mr-2 flex-1">
-        <Text className="text-sm leading-5 text-gray-900" numberOfLines={2}>
-          {item.title}
-        </Text>
-        {item.subtitle && (
-          <Text className="mt-0.5 text-sm text-gray-500" numberOfLines={1}>
-            {item.subtitle}
-          </Text>
-        )}
-        <Text className="mt-1 text-xs text-gray-400">{item.time}</Text>
-      </View>
-
-      {/* Right action */}
-      {item.action === 'follow' && (
-        <FollowButton isFollowing={isFollowing} onPress={() => setIsFollowing(!isFollowing)} />
-      )}
-      {item.action === 'thumbnail' && <Thumbnail />}
-      {item.action === 'more' && (
-        <TouchableOpacity className="p-1">
-          <IconMore />
-        </TouchableOpacity>
-      )}
-    </TouchableOpacity>
+const enrichNotificationsWithAvatar = async (items) => {
+  const normalized = sortNotificationsByTime(
+    (Array.isArray(items) ? items : []).map(normalizeNotification)
   );
+  const senderIds = [...new Set(normalized.map((item) => item.senderId).filter(Boolean))];
+
+  if (senderIds.length === 0) return normalized;
+
+  const avatarEntries = await Promise.all(
+    senderIds.map(async (id) => {
+      try {
+        const user = await userService.getUserById(id);
+        return [id, user?.image?.url ?? null];
+      } catch {
+        return [id, null];
+      }
+    })
+  );
+
+  const avatarMap = Object.fromEntries(avatarEntries);
+
+  return normalized.map((item) => ({
+    ...item,
+    avatarUrl: item.senderId ? (avatarMap[item.senderId] ?? null) : null,
+  }));
 };
 
-// ─── Main Screen ──────────────────────────────────────────────
 export default function NotificationScreen() {
-  return (
-    <SafeAreaView className="flex-1 bg-white">
-      {/* List */}
-      <ScrollView showsVerticalScrollIndicator={false}>
-        {NOTIFICATIONS.map((item, index) => (
-          <View key={item.id}>
-            <NotifItem item={item} />
-            {/* Divider */}
-            {index < NOTIFICATIONS.length - 1 && <View className="mx-4 h-px bg-gray-100" />}
-          </View>
-        ))}
-      </ScrollView>
+  const [loading, setLoading] = useState(true);
+  const [notifications, setNotifications] = useState([]);
+  const [showToast, setShowToast] = useState(false);
+  const [toastMessage, setToastMessage] = useState('');
+  const toastTimerRef = useRef(null);
 
-      {/* Bottom Tab */}
+  useEffect(() => {
+    let mounted = true;
+
+    (async () => {
+      try {
+        setLoading(true);
+        const response = await userService.getNotifications(0, 20);
+        const items =
+          response?.content ??
+          response?.data?.content ??
+          response?.items ??
+          response?.data ??
+          (Array.isArray(response) ? response : []);
+
+        if (!mounted) return;
+
+        const enriched = await enrichNotificationsWithAvatar(items);
+        if (!mounted) return;
+        setNotifications(enriched);
+      } catch {
+        if (mounted) setNotifications([]);
+      } finally {
+        if (mounted) setLoading(false);
+      }
+    })();
+
+    return () => {
+      mounted = false;
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    };
+  }, []);
+
+  const showReadToast = (message) => {
+    setToastMessage(message);
+    setShowToast(true);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => {
+      setShowToast(false);
+      setToastMessage('');
+    }, 1000);
+  };
+
+  const handleReadNotification = async (item) => {
+    if (!item?.id) return;
+
+    try {
+      await userService.readNotification(item.id);
+      setNotifications((prev) =>
+        prev.map((notif) => (notif.id === item.id ? { ...notif, unread: false } : notif))
+      );
+      showReadToast(item.unread ? 'Đã đánh dấu là đã đọc' : 'Thông báo đã được mở');
+    } catch {}
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView className="flex-1 items-center justify-center bg-white">
+        <ActivityIndicator color="#000" />
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView className="flex-1 bg-[#f8fafc]">
+      <Toast visible={showToast} message={toastMessage} />
+
+      <FlatList
+        data={notifications}
+        keyExtractor={(item) => item.id}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingTop: 18, paddingBottom: 100 }}
+        renderItem={({ item }) => <NotifItem item={item} onPress={handleReadNotification} />}
+        ListEmptyComponent={
+          <View className="items-center px-6 py-16">
+            <Text style={{ fontSize: 42, marginBottom: 12 }}>🔔</Text>
+            <Text className="mb-2 text-base font-semibold text-gray-800">Chưa có thông báo</Text>
+            <Text className="text-center text-sm text-gray-400">
+              Các cập nhật mới từ hệ thống và người dùng khác sẽ xuất hiện tại đây.
+            </Text>
+          </View>
+        }
+      />
+
       <BottomTab />
     </SafeAreaView>
   );

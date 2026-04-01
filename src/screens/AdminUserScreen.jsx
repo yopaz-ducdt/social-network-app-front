@@ -27,7 +27,11 @@ const UserItem = ({ user, onToggle, isToggling }) => {
       <View
         className={`mr-3 h-11 w-11 items-center justify-center overflow-hidden rounded-full ${isBlocked ? 'bg-gray-200' : 'bg-gray-100'}`}>
         {user.avatarUrl ? (
-          <Image source={{ uri: user.avatarUrl }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+          <Image
+            source={{ uri: user.avatarUrl }}
+            style={{ width: '100%', height: '100%' }}
+            resizeMode="cover"
+          />
         ) : (
           <Text style={{ fontSize: 20, opacity: isBlocked ? 0.4 : 1 }}>👤</Text>
         )}
@@ -51,8 +55,9 @@ const UserItem = ({ user, onToggle, isToggling }) => {
         onPress={() => onToggle(user.id)}
         disabled={isToggling}
         activeOpacity={0.8}
-        className={`h-10 w-10 items-center justify-center rounded-full border-2 ${isBlocked ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
-          }`}>
+        className={`h-10 w-10 items-center justify-center rounded-full border-2 ${
+          isBlocked ? 'border-gray-900 bg-gray-900' : 'border-gray-300'
+        }`}>
         {isToggling ? (
           <ActivityIndicator size="small" color={isBlocked ? '#fff' : '#000'} />
         ) : (
@@ -85,9 +90,9 @@ export default function AdminUsersScreen() {
   }, []);
 
   const loadUsers = useCallback(async () => {
-    const payload = await adminService.getUsers(search.trim(), 0, 50);
+    const payload = await adminService.getUsers('', 0, 200);
     setUsers(normalizeUsers(payload));
-  }, [normalizeUsers, search]);
+  }, [normalizeUsers]);
 
   useEffect(() => {
     let mounted = true;
@@ -147,10 +152,13 @@ export default function AdminUsersScreen() {
   };
 
   const filtered = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+
     return users.filter((u) => {
       const matchSearch =
-        u.fullName.toLowerCase().includes(search.toLowerCase()) ||
-        u.id.toLowerCase().includes(search.toLowerCase());
+        !normalizedSearch ||
+        u.fullName.toLowerCase().includes(normalizedSearch) ||
+        u.id.toLowerCase().includes(normalizedSearch);
       const matchTab =
         activeTab === 'all' ||
         (activeTab === 'active' && u.status === 'active') ||
@@ -196,11 +204,13 @@ export default function AdminUsersScreen() {
             key={tab.key}
             onPress={() => setActiveTab(tab.key)}
             activeOpacity={0.8}
-            className={`rounded-full border px-4 py-1.5 ${activeTab === tab.key ? 'border-gray-900 bg-gray-900' : 'border-gray-200 bg-white'
-              }`}>
+            className={`rounded-full border px-4 py-1.5 ${
+              activeTab === tab.key ? 'border-gray-900 bg-gray-900' : 'border-gray-200 bg-white'
+            }`}>
             <Text
-              className={`text-xs font-semibold ${activeTab === tab.key ? 'text-white' : 'text-gray-600'
-                }`}>
+              className={`text-xs font-semibold ${
+                activeTab === tab.key ? 'text-white' : 'text-gray-600'
+              }`}>
               {tab.label}
             </Text>
           </TouchableOpacity>
@@ -211,11 +221,7 @@ export default function AdminUsersScreen() {
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
-          <UserItem
-            user={item}
-            onToggle={handleToggle}
-            isToggling={togglingId === item.id}
-          />
+          <UserItem user={item} onToggle={handleToggle} isToggling={togglingId === item.id} />
         )}
         ListHeaderComponent={
           loading ? (
